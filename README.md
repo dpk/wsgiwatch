@@ -6,18 +6,20 @@ So you're developing a Python web application, and you have lots of assets that 
 
 Essentially, it's [LiveReload][lr] or [ServeIt][si], but as <100 lines of WSGI middleware.
 
+Compatible with at least Python 3.4.
+
 [lr]: https://livereload.readthedocs.org/en/latest/
 [si]: https://github.com/garybernhardt/serveit
 
 ## Usage
 
-```
+```python
 watcher = WSGIWatch(app)
 ```
 
 Once you've wrapped your WSGI app in a `WSGIWatcher`, you can add files and directories to be watched, and the commands to be run when they change. You can also specify a glob pattern:
 
-```
+```python
 watcher.watch('assets', 'make')
 watcher.watch('assets/*.js', 'make static/bundle.js')
 watcher.watch('assets/*.js', build_js_bundle)
