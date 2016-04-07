@@ -1,3 +1,4 @@
+import glob
 import os
 import os.path
 import subprocess
@@ -28,7 +29,7 @@ class WSGIWatch:
             return task
         elif isinstance(task, str):
             def run_process():
-                subprocess.check_call(task)
+                subprocess.check_call(task, shell=True)
             return run_process
     
     def __call__(self, environ, start_response):
@@ -55,6 +56,7 @@ class DirectoryPath:
 
     def last_modified(self):
         def mtimes():
+            yield 0 # otherwise we fail on empty directories
             for subdir, subsubdirs, files in os.walk(self.directory):
                 yield from (os.path.getmtime(os.path.join(subdir, subsubdir)) for subsubdir in subsubdirs)
                 yield from (os.path.getmtime(os.path.join(subdir, file)) for file in files)
@@ -66,5 +68,15 @@ class DirectoryPath:
 class GlobPath:
     def __init__(self, pattern):
         self.pattern = pattern
+        # this is a bit of a hack really
+        self.last_match = []
+    
+    def last_modified(self):
+        matches = glob.glob(self.pattern)
+        if self.last_match != matches:
+            self.last_match = matches
+            return time.time()
+        
+        return max([0] + [os.path.getmtime(match) for match in matches])
 
     def __hash__(self): return hash(self.pattern)
