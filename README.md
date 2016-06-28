@@ -6,7 +6,7 @@ So you're developing a Python web application, and you have lots of assets that 
 
 Essentially, it's [LiveReload][lr] or [ServeIt][si], but as <100 lines of WSGI middleware.
 
-Compatible with at least Python 3.4.
+Compatible with at least Python 3.4. Tested on the latest Python 2.7 but with no support plan for Python 2 going forward — if it breaks, it breaks.
 
 [lr]: https://livereload.readthedocs.org/en/latest/
 [si]: https://github.com/garybernhardt/serveit
