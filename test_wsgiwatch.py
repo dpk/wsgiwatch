@@ -37,7 +37,7 @@ def directory(request):
 @pytest.fixture
 def file(request):
     name = filename()
-    open(name, 'x').close()
+    open(name, 'a').close()
     request.addfinalizer(lambda: os.remove(name))
 
     return name
@@ -46,6 +46,14 @@ def file(request):
 def watcher():
     return WSGIWatch(wsgi_app)
 
+class CallChecker:
+    def __init__(self): self.called = False
+    def __call__(self): self.called = True
+    def reset(self): self.called = False
+@pytest.fixture
+def builder():
+    return CallChecker()
+
 
 def test_without_paths(watcher):
     client = make_client(watcher)
@@ -53,33 +61,25 @@ def test_without_paths(watcher):
 
     assert resp.status_code == 200
 
-def test_builds_first_time(watcher, file):
+def test_builds_first_time(watcher, file, builder):
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    watcher.watch(file, buildfn)
+    watcher.watch(file, builder)
 
     resp = client.get('/')
     assert resp.status_code == 200
-    assert called
+    assert builder.called
 
-def test_doesnt_build_second_time(watcher, file):
+def test_doesnt_build_second_time(watcher, file, builder):
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    watcher.watch(file, buildfn)
+    watcher.watch(file, builder)
 
     resp1 = client.get('/')
-    called = False
+    builder.reset()
 
     resp2 = client.get('/')
 
     assert resp2.status_code == 200
-    assert not called
+    assert not builder.called
 
 def test_build_with_shell_command(watcher, file, capfd):
     client = make_client(watcher)
@@ -91,13 +91,9 @@ def test_build_with_shell_command(watcher, file, capfd):
     assert resp.status_code == 200
     assert out == 'hello world'
 
-def test_rebuild_after_file_update(watcher, file):
+def test_rebuild_after_file_update(watcher, file, builder):
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    watcher.watch(file, buildfn)
+    watcher.watch(file, builder)
 
     resp1 = client.get('/')
     called = False
@@ -107,15 +103,11 @@ def test_rebuild_after_file_update(watcher, file):
 
     resp2 = client.get('/')
     assert resp2.status_code == 200
-    assert called
+    assert builder.called
 
-def test_watch_directory_contents(watcher, directory):
+def test_watch_directory_contents(watcher, directory, builder):
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    watcher.watch(directory, buildfn)
+    watcher.watch(directory, builder)
 
     resp1 = client.get('/')
     called = False
@@ -125,14 +117,14 @@ def test_watch_directory_contents(watcher, directory):
 
     resp2 = client.get('/')
     assert resp2.status_code == 200
-    assert called
+    assert builder.called
 
 def test_build_function_raises_exception(watcher, file):
     client = make_client(watcher)
 
-    def buildfn():
+    def builder():
         raise Exception
-    watcher.watch(file, buildfn)
+    watcher.watch(file, builder)
 
     with pytest.raises(Exception) as excinfo:
         resp2 = client.get('/')
@@ -144,60 +136,46 @@ def test_shell_nonzero_exit(watcher, file):
     with pytest.raises(subprocess.CalledProcessError) as excinfo:
         resp2 = client.get('/')
 
-def test_glob_matches_new_file(watcher, directory):
+def test_glob_matches_new_file(watcher, directory, builder):
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    
-    watcher.watch(directory + '/test*', buildfn)
+
+    watcher.watch(directory + '/test*', builder)
     resp1 = client.get('/')
-    called = False
-    
-    time.sleep(1)
+    builder.reset()
+
     touch(directory + '/test1')
     resp2 = client.get('/')
 
     assert resp2.status_code == 200
-    assert called
+    assert builder.called
 
-def test_glob_matches_deleted_file(watcher, directory):
+def test_glob_matches_deleted_file(watcher, directory, builder):
     touch(directory + '/test1')
     touch(directory + '/test2')
 
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    
-    watcher.watch(directory + '/test*', buildfn)
+
+    watcher.watch(directory + '/test*', builder)
     resp1 = client.get('/')
-    called = False
-    
-    time.sleep(1)
+    builder.reset()
+
     os.remove(directory + '/test2')
     resp2 = client.get('/')
 
     assert resp2.status_code == 200
-    assert called
+    assert builder.called
 
-def test_glob_matches_modified_file(watcher, directory):
+def test_glob_matches_modified_file(watcher, directory, builder):
     touch(directory + '/test1')
     client = make_client(watcher)
-    called = False
-    def buildfn():
-        nonlocal called
-        called = True
-    
-    watcher.watch(directory + '/test*', buildfn)
+
+    watcher.watch(directory + '/test*', builder)
     resp1 = client.get('/')
-    called = False
-    
+    builder.reset()
+
     time.sleep(1)
     touch(directory + '/test1')
     resp2 = client.get('/')
 
     assert resp2.status_code == 200
-    assert called
+    assert builder.called
