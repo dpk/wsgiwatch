@@ -33,12 +33,13 @@ class WSGIWatch:
             return run_process
 
     def __call__(self, environ, start_response):
+        lbt = time.time()
         with self.lock:
             for path, task in self.paths.items():
                 if path.last_modified() > self.last_build_time:
                     task()
 
-        self.last_build_time = time.time()
+        self.last_build_time = lbt
         return self.app(environ, start_response)
 
 class FilePath:
