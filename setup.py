@@ -10,7 +10,7 @@ from distutils.core import setup
 
 setup(
   name = 'wsgiwatch',
-  version = '0.1.1',
+  version = '0.1.2',
   description = 'Synchronously rebuild assets for a WSGI application in response to source file changes',
   author = 'David P. Kendal',
   author_email = 'pypi@dpk.io',
